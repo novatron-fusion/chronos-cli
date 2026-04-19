@@ -198,9 +198,34 @@ The `format` field accepts a string to enumerate the output video format, suppor
 | `"tiffraw"`           | Directory of 16-bit TIFF files containing the raw sensor data.
 | `"byr2"` or `"y16"`   | Raw sensor data padded to 16-bit little-endian encoding.
 | `"y12b"`              | Raw sensor data in packed 12-bit little-endian encoding.
+| `"h5"`                | Single HDF5 file with a chunked, shuffle+deflate-compressed `/frames` dataset (uint16).
 
-The `framerate` and `bitrate` fields are only used for H.264 compressed video formats, and are ignored
-for all other encoding formats.
+The `bitrate` field is only used for H.264. The `framerate` field is used for H.264 and, for `"h5"`,
+is written to the `/frames` dataset as the `frame_rate_hz` attribute (zero/omitted => attribute not written).
+All other `recordfile` args keys that aren't in the table above are passed through when `format="h5"` and
+written as string attributes on the HDF5 root group, so callers can stamp shot metadata (e.g. `shot_id`,
+`experiment_id`, `t0_ns`) without pipeline changes.
+
+### `"h5"` file layout
+
+```
+<filename>
+  /frames                     uint16, shape=(length, vRes, hRes),
+                              chunks=(min(16,length), vRes, hRes),
+                              shuffle + deflate(3)
+    attrs:
+      resolution              uint32[2] (hRes, vRes), always written
+      created_utc             int64 seconds-since-epoch, always written
+      frame_rate_hz           double, written iff framerate != 0
+      exposure_us             uint32, written iff nonzero (not plumbed yet; pass as string extra)
+      sensor_bit_depth        uint32, always 12 for LUX1310/LUX2100
+  root attrs:
+      <any extra string key from the recordfile args dict>
+```
+
+If `recordfile` aborts mid-stream (write error, `stop`, NAS full), the partial file is `unlink()`ed
+on teardown so you never see a half-written HDF5 on disk. A clean completion emits `eof` with an
+empty error string and leaves the file in place.
 
 liverecord
 ----------

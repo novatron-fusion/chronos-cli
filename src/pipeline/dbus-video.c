@@ -402,13 +402,20 @@ cam_video_recordfile(CamVideo *vobj, GHashTable *args, GHashTable **data, GError
         /* 12-bit samples padded with lsb zeros to fit 16-bit data. */
         state->args.mode = PIPELINE_MODE_RAW16;
     }
-    else if ((strcasecmp(format, "pRAA") == 0) || 
+    else if ((strcasecmp(format, "pRAA") == 0) ||
                 (strcasecmp(format, "pgAA") == 0) ||
                 (strcasecmp(format, "pGAA") == 0) ||
                 (strcasecmp(format, "pBAA") == 0) ||
                 (strcasecmp(format, "y12b") == 0)) {
         /* 12-bit samples packed (2 pixels stored in 3 bytes) */
         state->args.mode = PIPELINE_MODE_RAW12;
+    }
+    else if (strcasecmp(format, "h5") == 0) {
+        /* HDF5 chunked uint16 /frames dataset. */
+        state->args.mode = PIPELINE_MODE_H5;
+        state->args.framerate = cam_dbus_dict_get_uint(args, "framerate", 0);
+        h5_free_extras(state->h5_extras);
+        state->h5_extras = h5_extras_from_dict(args);
     }
     /* Otherwise, this encoding format is not supported. */
     else {

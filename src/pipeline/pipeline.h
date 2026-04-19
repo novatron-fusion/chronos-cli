@@ -24,6 +24,7 @@
 #include "ioport.h"
 #include "segment.h"
 #include "fpga.h"
+#include "h5.h"
 
 #define SCREENCAP_PATH      "/tmp/cam-screencap.jpg"
 
@@ -76,6 +77,7 @@ typedef void (*rtsp_session_hook_t)(const struct rtsp_session *sess, void *closu
 #define PIPELINE_MODE_DNG       6
 #define PIPELINE_MODE_TIFF      7   /* Processed 8-bit TIFF format. */
 #define PIPELINE_MODE_TIFF_RAW  8   /* Linear RAW 16-bit TIFF format. */
+#define PIPELINE_MODE_H5        9   /* HDF5 chunked uint16 /frames dataset. */
 
 #define PIPELINE_IS_SAVING(_mode_) ((_mode_) > PIPELINE_MODE_PLAY)
 
@@ -195,6 +197,10 @@ struct pipeline_state {
     char            liverec_filename[PATH_MAX];
     guint           liverec_bufprobe;
 
+    /* HDF5 sink (PIPELINE_MODE_H5) */
+    h5_sink_t       *h5_sink;
+    char            **h5_extras;  /* NULL-terminated k,v,...,NULL. Owned. */
+
     /* Pipeline config */
     struct pipeline_args args;
     struct source_config source;
@@ -218,6 +224,9 @@ GstPad *cam_raw_sink(struct pipeline_state *state, struct pipeline_args *args);
 GstPad *cam_dng_sink(struct pipeline_state *state, struct pipeline_args *args);
 GstPad *cam_tiff_sink(struct pipeline_state *state, struct pipeline_args *args);
 GstPad *cam_tiffraw_sink(struct pipeline_state *state, struct pipeline_args *args);
+GstPad *cam_h5_sink(struct pipeline_state *state, struct pipeline_args *args);
+char **h5_extras_from_dict(GHashTable *args);
+void    h5_free_extras(char **extras);
 
 /* Some background elements. */
 struct CamVideo *dbus_service_launch(struct pipeline_state *state);

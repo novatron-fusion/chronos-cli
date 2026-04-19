@@ -480,6 +480,36 @@ cam_filesave(struct pipeline_state *state, struct pipeline_args *args)
         gst_pad_link(tpad, sinkpad);
         gst_object_unref(sinkpad);
     }
+    /*=====================================================
+     * Setup the Pipeline for HDF5 recording (uint16 frames).
+     *=====================================================
+     */
+    else if (args->mode == PIPELINE_MODE_H5) {
+        GstCaps *caps = gst_caps_new_simple ("video/x-raw-gray",
+                    "bpp", G_TYPE_INT, 16,
+                    "width", G_TYPE_INT, state->source.hframe,
+                    "height", G_TYPE_INT, state->source.vframe,
+                    "framerate", GST_TYPE_FRACTION, LIVE_MAX_FRAMERATE, 1,
+                    "buffer-count-requested", G_TYPE_INT, 4,
+                    NULL);
+        ret = gst_element_link_filtered(state->vidsrc, tee, caps);
+        if (!ret) {
+            gst_object_unref(GST_OBJECT(state->pipeline));
+            return NULL;
+        }
+        gst_caps_unref(caps);
+
+        sinkpad = cam_h5_sink(state, args);
+        if (!sinkpad) {
+            gst_object_unref(GST_OBJECT(state->pipeline));
+            return NULL;
+        }
+        tpad = gst_element_get_request_pad(tee, "src%d");
+        gst_pad_link(tpad, sinkpad);
+        gst_object_unref(sinkpad);
+
+        state->fpga->display->pipeline |= DISPLAY_PIPELINE_RAW_16PAD | DISPLAY_PIPELINE_RAW_16BPP;
+    }
     /* Otherwise, this recording mode is not supported. */
     else {
         return NULL;
@@ -969,6 +999,16 @@ main(int argc, char * argv[])
         if (state->liverec_fd >= 0) {
             close(state->liverec_fd);
             state->liverec_fd = -1;
+        }
+
+        /* Close any pending HDF5 sink. Errored flag drives unlink of partial file. */
+        if (state->h5_sink) {
+            h5_sink_close(state->h5_sink, state->error[0] != '\0');
+            state->h5_sink = NULL;
+        }
+        if (state->h5_extras) {
+            h5_free_extras(state->h5_extras);
+            state->h5_extras = NULL;
         }
 
         /* Signal end of video after teardown and syncing output files. */

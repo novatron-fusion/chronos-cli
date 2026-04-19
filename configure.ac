@@ -20,23 +20,42 @@ AM_CONDITIONAL(CAMBUILD, [test "$XCOMPILE" = "camera"])
 
 GST_REQUIRED=0.10.32
 
-PKG_CHECK_MODULES(GLIB, [glib-2.0 gio-2.0])
-PKG_CHECK_MODULES(DBUS, [dbus-glib-1])
-PKG_CHECK_MODULES(XML, [libxml-2.0])
-PKG_CHECK_MODULES(GST, [
-  gstreamer-0.10 >= $GST_REQUIRED
-  gstreamer-base-0.10 >= $GST_REQUIRED
-  gstreamer-controller-0.10 >= $GST_REQUIRED
-], [
-  AC_SUBST(GST_CFLAGS)
-  AC_SUBST(GST_LIBS)
-], [
-  AC_MSG_ERROR([
-      You need to install or upgrade the GStreamer development
-      packages on your system. On debian-based systems these are
-      libgstreamer0.10-dev and libgstreamer-plugins-base0.10-dev.
-      on RPM-based systems gstreamer0.10-devel, libgstreamer0.10-devel
-      or similar. The minimum version required is $GST_REQUIRED.
+## GLib / DBus / libxml are only required for the camera build. Host builds
+## only run the libhdf5-only Tier-1 test, so skip those checks there.
+if test "$XCOMPILE" = "camera"; then
+  PKG_CHECK_MODULES(GLIB, [glib-2.0 gio-2.0])
+  PKG_CHECK_MODULES(DBUS, [dbus-glib-1])
+  PKG_CHECK_MODULES(XML, [libxml-2.0])
+  PKG_CHECK_MODULES(GST, [
+    gstreamer-0.10 >= $GST_REQUIRED
+    gstreamer-base-0.10 >= $GST_REQUIRED
+    gstreamer-controller-0.10 >= $GST_REQUIRED
+  ], [
+    AC_SUBST(GST_CFLAGS)
+    AC_SUBST(GST_LIBS)
+  ], [
+    AC_MSG_ERROR([
+        You need to install or upgrade the GStreamer development
+        packages on your system. On debian-based systems these are
+        libgstreamer0.10-dev and libgstreamer-plugins-base0.10-dev.
+        on RPM-based systems gstreamer0.10-devel, libgstreamer0.10-devel
+        or similar. The minimum version required is $GST_REQUIRED.
+    ])
+  ])
+fi
+
+## HDF5 for the h5 recording format. Try pkg-config first (hdf5 or hdf5-serial),
+## fall back to a plain -lhdf5 if the .pc file isn't shipped (older jessie).
+PKG_CHECK_MODULES(HDF5, [hdf5], [], [
+  PKG_CHECK_MODULES(HDF5, [hdf5-serial], [], [
+    AC_CHECK_HEADER([hdf5.h], [],
+      [AC_MSG_ERROR([hdf5.h not found -- install libhdf5-dev])])
+    AC_CHECK_LIB([hdf5], [H5Fcreate], [],
+      [AC_MSG_ERROR([libhdf5 not found -- install libhdf5-dev])])
+    HDF5_CFLAGS=""
+    HDF5_LIBS="-lhdf5"
+    AC_SUBST(HDF5_CFLAGS)
+    AC_SUBST(HDF5_LIBS)
   ])
 ])
 
