@@ -20,6 +20,10 @@ AM_CONDITIONAL(CAMBUILD, [test "$XCOMPILE" = "camera"])
 
 GST_REQUIRED=0.10.32
 
+## Ensure pkg-config is detected unconditionally -- the HDF5 check below
+## needs it even on host-only builds.
+PKG_PROG_PKG_CONFIG
+
 ## GLib / DBus / libxml are only required for the camera build. Host builds
 ## only run the libhdf5-only Tier-1 test, so skip those checks there.
 if test "$XCOMPILE" = "camera"; then

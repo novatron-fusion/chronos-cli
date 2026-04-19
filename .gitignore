@@ -2,6 +2,7 @@
 .*
 *.o
 __pycache__/
+/config.h
 /src/config.h
 /src/cam-daemon
 /src/cam-json
@@ -11,9 +12,14 @@ __pycache__/
 /src/cam-pipeline
 /src/cam-regdump
 /src/libcamera.a
+/src/test_h5_sink
 
 # backup files from emacs
 *~
+
+# Automake test runner output
+*.log
+*.trs
 
 # http://www.gnu.org/software/automake
 Makefile
@@ -45,6 +51,7 @@ Makefile.in
 
 # https://www.gnu.org/software/libtool/
 
+/libtool
 /ltmain.sh
 
 # http://www.gnu.org/software/texinfo

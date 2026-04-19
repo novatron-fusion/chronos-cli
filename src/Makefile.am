@@ -1,10 +1,13 @@
 ## The stuff we want to build.
+AM_CFLAGS = -I ${srcdir}/lib
+if CAMBUILD
 noinst_LIBRARIES = libcamera.a
 bin_PROGRAMS = cam-pipeline cam-pcUtil
 bin_PROGRAMS += cam-loader cam-regdump cam-recover
 bin_PROGRAMS += cam-json cam-listener cam-scgi
 bin_PROGRAMS += fw-logger
-AM_CFLAGS = -I ${srcdir}/lib
+endif
+
 AM_CFLAGS += -Wno-deprecated-declarations
 AM_LDFLAGS = -pthread
 GLIB_LIBS += -lpcre
