@@ -151,7 +151,17 @@ file ~/sysroot-overlay/merged/home/chronos-cli/src/cam-pipeline
 # ELF 32-bit LSB executable, ARM, EABI5 ...
 ```
 
-Copy it to the camera's `/usr/bin/` to deploy.
+#### 6. Deploy to camera
+
+Copy the binary to the camera and restart the video service:
+
+```bash
+scp ~/sysroot-overlay/merged/home/chronos-cli/src/cam-pipeline root@<camera-ip>:/usr/bin/cam-pipeline
+ssh root@<camera-ip> systemctl restart chronos-video
+```
+
+No full reboot is needed — `cam-pipeline` runs as the `chronos-video` systemd
+service, so restarting it is sufficient.
 
 #### Cleanup
 
