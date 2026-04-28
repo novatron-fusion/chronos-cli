@@ -136,13 +136,8 @@ h5_sink_open(const char *path, uint32_t hres, uint32_t vres, uint32_t nframes,
 
     plist = H5Pcreate(H5P_DATASET_CREATE);
     if (plist < 0) goto fail;
-    chunk[0] = (nframes < H5_CHUNK_FRAMES) ? nframes : H5_CHUNK_FRAMES;
-    chunk[1] = vres; chunk[2] = hres;
+    chunk[0] = 1; chunk[1] = vres; chunk[2] = hres;
     if (H5Pset_chunk(plist, 3, chunk) < 0) goto fail;
-    /* Shuffle must be applied BEFORE deflate so consecutive bytes of u16s
-     * sit next to each other, giving the compressor something repetitive. */
-    if (H5Pset_shuffle(plist) < 0) goto fail;
-    if (H5Pset_deflate(plist, 3) < 0) goto fail;
 
     s->dset = H5Dcreate2(s->file, "/frames", H5T_NATIVE_UINT16, s->dspace,
                          H5P_DEFAULT, plist, H5P_DEFAULT);
@@ -150,6 +145,18 @@ h5_sink_open(const char *path, uint32_t hres, uint32_t vres, uint32_t nframes,
     if (s->dset < 0) {
         fprintf(stderr, "h5_sink_open: H5Dcreate2(/frames) failed\n");
         goto fail;
+    }
+
+    /* Enlarge the raw-data chunk cache so the library doesn't evict the
+     * current chunk while we're still filling it.  Each chunk is
+     * 1 × vres × hres × 2 bytes; cache 32 of them. */
+    {
+        hid_t dapl = H5Dget_access_plist(s->dset);
+        if (dapl >= 0) {
+            size_t frame_bytes = (size_t)vres * hres * 2;
+            H5Pset_chunk_cache(dapl, 32, 32 * frame_bytes, 1.0);
+            H5Pclose(dapl);
+        }
     }
 
     mdims[0] = 1; mdims[1] = vres; mdims[2] = hres;
@@ -208,6 +215,12 @@ fail:
         free(s);
     }
     return NULL;
+}
+
+uint32_t
+h5_sink_frame_idx(const h5_sink_t *sink)
+{
+    return sink ? sink->frame_idx : 0;
 }
 
 int

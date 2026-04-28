@@ -24,12 +24,13 @@ options:
    --tiff          Save processed RGB images in Adobe TIFF format.
    --raw16         Save uncompressed raw images in 16-bit binary format.
    --raw12         Save uncompressed raw images in 12-bit packed binary format.
+   --h5            Save raw frames in HDF5 format.
 EOF
 }
 
 ## Parse Arguments
 OPTS=$(getopt \
-   --longoptions start:,length:,bitrate:,framerate:,h264,dng,tiff,raw16,raw12,help \
+   --longoptions start:,length:,bitrate:,framerate:,h264,dng,tiff,raw16,raw12,h5,help \
    --options h \
    --name "$NAME" \
    -- $@)
@@ -73,6 +74,21 @@ while [[ $# -gt 0 ]]; do
          shift 1
          ;;
 
+      --raw16)
+         FORMAT="raw16"
+         shift 1
+         ;;
+
+      --raw12)
+         FORMAT="raw12"
+         shift 1
+         ;;
+
+      --h5)
+         FORMAT="h5"
+         shift 1
+         ;;
+
       --help|-h)
          show_help
          shift 1
@@ -113,5 +129,5 @@ mkjson() {
 }
 
 ## Do the recording
-mkjson | /opt/camera/cam-json -v recordfile -
+mkjson | cam-json -v recordfile -
 

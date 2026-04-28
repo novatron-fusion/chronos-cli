@@ -98,10 +98,11 @@ sudo mount -t overlay overlay \
     $HOME/sysroot-overlay/merged
 ```
 
-#### 3. Install HDF5 into the sysroot (if not already present)
+#### 3. Install HDF5 into the sysroot (first time only)
 
-Download the Jessie armel HDF5 packages from the Debian archive and extract
-them into the overlay:
+The overlay upper dir (`~/sysroot-overlay/upper`) persists across remounts,
+so this step is only needed once. Download the Jessie armel HDF5 packages
+from the Debian archive and extract them into the overlay:
 
 ```bash
 cd /tmp
@@ -115,7 +116,8 @@ sudo dpkg-deb -x libhdf5-dev_1.8.13+docs-15+deb8u1_armel.deb ~/sysroot-overlay/m
 
 ```bash
 sudo cp /usr/bin/qemu-arm-static ~/sysroot-overlay/merged/usr/bin/
-sudo cp -a /path/to/chronos-cli ~/sysroot-overlay/merged/home/chronos-cli
+sudo rm -rf ~/sysroot-overlay/merged/home/chronos-cli
+sudo cp -a ~/chronos-cli ~/sysroot-overlay/merged/home/chronos-cli
 ```
 
 The autotools auxiliary files (`install-sh`, `compile`, `missing`, etc.) are
@@ -153,7 +155,15 @@ file ~/sysroot-overlay/merged/home/chronos-cli/src/cam-pipeline
 
 #### 6. Deploy to camera
 
-Copy the binary to the camera and restart the video service:
+The binary dynamically links `libhdf5_serial.so.8`, so the runtime library
+must be installed on the camera (first time only):
+
+```bash
+scp /tmp/libhdf5-8_1.8.13+docs-15+deb8u1_armel.deb root@<camera-ip>:/tmp/
+ssh root@<camera-ip> dpkg -i /tmp/libhdf5-8_1.8.13+docs-15+deb8u1_armel.deb
+```
+
+Copy the binary and restart the video service:
 
 ```bash
 scp ~/sysroot-overlay/merged/home/chronos-cli/src/cam-pipeline root@<camera-ip>:/usr/bin/cam-pipeline
@@ -170,3 +180,15 @@ sudo umount ~/sysroot-overlay/merged
 sudo umount ~/chronos-sysroot
 rm -rf ~/sysroot-overlay
 ```
+
+## VS Code tasks
+
+The project includes VS Code tasks in `.vscode/tasks.json`:
+
+- **Build (ARM chroot)** (`Ctrl+Shift+B`) — copies source into the chroot,
+  fixes autotools symlinks, and runs `configure && make` via QEMU.
+- **Build + test (host)** — runs `configure && make check` natively.
+- **Mount chroot** — sets up the image + overlay mounts (run once per session).
+- **Unmount chroot** — tears down the mounts.
+
+Run "Mount chroot" first, then use `Ctrl+Shift+B` to build repeatedly.

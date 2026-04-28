@@ -79,9 +79,16 @@ h5_probe(GstPad *pad, GstBuffer *buffer, gpointer cbdata)
 {
     struct pipeline_state *state = cbdata;
     size_t expected;
+    uint32_t idx;
 
-    (void)pad;
     if (!state->h5_sink) return TRUE;
+
+    /* If all frames are written, push EOS to stop the pipeline. */
+    idx = h5_sink_frame_idx(state->h5_sink);
+    if (idx >= state->args.length) {
+        gst_pad_push_event(pad, gst_event_new_eos());
+        return FALSE;  /* drop this buffer */
+    }
 
     expected = (size_t)state->source.hres * (size_t)state->source.vres * 2;
     if (GST_BUFFER_SIZE(buffer) < expected) {
@@ -93,6 +100,12 @@ h5_probe(GstPad *pad, GstBuffer *buffer, gpointer cbdata)
     if (h5_sink_write_frame(state->h5_sink,
                             (const uint16_t *)GST_BUFFER_DATA(buffer)) < 0) {
         snprintf(state->error, sizeof(state->error), "h5 write failed");
+        gst_pad_push_event(pad, gst_event_new_eos());
+        return FALSE;
+    }
+    idx = h5_sink_frame_idx(state->h5_sink);
+    if ((idx % 10) == 0 || idx == state->args.length) {
+        fprintf(stderr, "h5: saved frame %u / %lu\n", idx, state->args.length);
     }
     return TRUE;
 }
