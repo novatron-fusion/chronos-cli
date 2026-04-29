@@ -48,20 +48,36 @@ if test "$XCOMPILE" = "camera"; then
   ])
 fi
 
-## HDF5 for the h5 recording format. Try pkg-config first (hdf5 or hdf5-serial),
-## fall back to a plain -lhdf5 if the .pc file isn't shipped (older jessie).
-PKG_CHECK_MODULES(HDF5, [hdf5], [], [
-  PKG_CHECK_MODULES(HDF5, [hdf5-serial], [], [
-    AC_CHECK_HEADER([hdf5.h], [],
-      [AC_MSG_ERROR([hdf5.h not found -- install libhdf5-dev])])
-    AC_CHECK_LIB([hdf5], [H5Fcreate], [],
-      [AC_MSG_ERROR([libhdf5 not found -- install libhdf5-dev])])
-    HDF5_CFLAGS=""
-    HDF5_LIBS="-lhdf5"
-    AC_SUBST(HDF5_CFLAGS)
-    AC_SUBST(HDF5_LIBS)
+## HDF5 for the h5 recording format.
+## On camera builds: prefer a static HDF5 via --with-hdf5-static=DIR so that
+## cam-pipeline has no runtime dependency on libhdf5.so.
+## On host builds (make check): use the system libhdf5-dev via pkg-config.
+AC_ARG_WITH([hdf5-static],
+  [AS_HELP_STRING([--with-hdf5-static=DIR],
+    [Use a statically-built HDF5 installed in DIR (camera builds)])],
+  [hdf5_static_dir="$withval"],
+  [hdf5_static_dir=""])
+
+if test -n "$hdf5_static_dir"; then
+  AC_MSG_NOTICE([Using static HDF5 from $hdf5_static_dir])
+  HDF5_CFLAGS="-I${hdf5_static_dir}/include"
+  HDF5_LIBS="${hdf5_static_dir}/lib/libhdf5.a -lz -ldl -lm"
+  AC_SUBST(HDF5_CFLAGS)
+  AC_SUBST(HDF5_LIBS)
+else
+  PKG_CHECK_MODULES(HDF5, [hdf5], [], [
+    PKG_CHECK_MODULES(HDF5, [hdf5-serial], [], [
+      AC_CHECK_HEADER([hdf5.h], [],
+        [AC_MSG_ERROR([hdf5.h not found -- install libhdf5-dev])])
+      AC_CHECK_LIB([hdf5], [H5Fcreate], [],
+        [AC_MSG_ERROR([libhdf5 not found -- install libhdf5-dev])])
+      HDF5_CFLAGS=""
+      HDF5_LIBS="-lhdf5"
+      AC_SUBST(HDF5_CFLAGS)
+      AC_SUBST(HDF5_LIBS)
+    ])
   ])
-])
+fi
 
 AC_SYS_LARGEFILE
 

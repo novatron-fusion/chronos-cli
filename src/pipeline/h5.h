@@ -14,7 +14,10 @@
 /*
  * HDF5 sink for the camera pipeline. Accepts uint16 frames one at a time and
  * streams them into a chunked /frames dataset (one frame per chunk,
- * uncompressed).
+ * bitshuffle+LZ4 compressed via H5Dwrite_chunk).
+ *
+ * Readers need the bitshuffle HDF5 filter plugin (filter ID 32008) or
+ * Python h5py with `import bitshuffle.h5` to decompress transparently.
  *
  * This header is deliberately free of GLib / GStreamer / pipeline_state so it
  * can be linked against by a host-side test harness that only needs libhdf5.
@@ -33,7 +36,7 @@ typedef struct {
 } h5_attrs_t;
 
 /* Create /path, write an empty /frames dataset shaped (nframes, vres, hres)
- * with chunk (1, vres, hres), uncompressed, plus attrs.
+ * with chunk (1, vres, hres), bitshuffle+LZ4 filter (ID 32008), plus attrs.
  * Returns NULL on failure and removes any partial file. */
 h5_sink_t *h5_sink_open(const char *path,
                         uint32_t hres, uint32_t vres, uint32_t nframes,

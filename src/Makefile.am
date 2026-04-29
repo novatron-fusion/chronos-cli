@@ -98,10 +98,13 @@ cam_loader_CFLAGS = ${AM_CFLAGS} ${DBUS_CFLAGS}
 cam_loader_LDFLAGS = ${AM_LDFLAGS}
 cam_loader_SOURCES = cam-loader.c
 
+## Bitshuffle + LZ4 include paths (vendored third-party sources).
+BSHUF_CFLAGS = -I${srcdir}/third_party/bitshuffle -I${srcdir}/third_party/lz4
+
 ## GStreamer Daemon for running the video system.
 cam_pipeline_LDADD = libcamera.a
 cam_pipeline_LDADD += ${DBUS_LIBS} ${GLIB_LIBS} ${GST_LIBS} ${HDF5_LIBS} -lpcre
-cam_pipeline_CFLAGS = ${AM_CFLAGS} ${DBUS_CFLAGS} ${GST_CFLAGS} ${HDF5_CFLAGS}
+cam_pipeline_CFLAGS = ${AM_CFLAGS} ${DBUS_CFLAGS} ${GST_CFLAGS} ${HDF5_CFLAGS} ${BSHUF_CFLAGS}
 cam_pipeline_LDFLAGS = ${AM_LDFLAGS} -pthread
 cam_pipeline_LDADD += -ljpeg -lrt
 cam_pipeline_SOURCES = pipeline/cam-pipeline.c
@@ -123,6 +126,11 @@ cam_pipeline_SOURCES += pipeline/rtsp-private.h
 cam_pipeline_SOURCES += pipeline/screencap.c
 cam_pipeline_SOURCES += pipeline/pipeline.h
 cam_pipeline_SOURCES += pipeline/h5.h
+# Vendored bitshuffle + LZ4 for HDF5 compression.
+cam_pipeline_SOURCES += third_party/bitshuffle/bitshuffle.c
+cam_pipeline_SOURCES += third_party/bitshuffle/bitshuffle_core.c
+cam_pipeline_SOURCES += third_party/bitshuffle/iochain.c
+cam_pipeline_SOURCES += third_party/lz4/lz4.c
 # Private gstreamer elements.
 cam_pipeline_SOURCES += pipeline/gst/gifdec.c
 cam_pipeline_SOURCES += pipeline/gst/gifdec.h
@@ -161,7 +169,12 @@ if !CAMBUILD
 check_PROGRAMS = test_h5_sink
 TESTS = test_h5_sink
 test_h5_sink_SOURCES = pipeline/test_h5_sink.c pipeline/h5.c pipeline/h5.h
-test_h5_sink_CFLAGS = ${HDF5_CFLAGS} -I${srcdir}/pipeline
+test_h5_sink_SOURCES += third_party/bitshuffle/bitshuffle.c
+test_h5_sink_SOURCES += third_party/bitshuffle/bitshuffle_core.c
+test_h5_sink_SOURCES += third_party/bitshuffle/iochain.c
+test_h5_sink_SOURCES += third_party/bitshuffle/bshuf_h5filter.c
+test_h5_sink_SOURCES += third_party/lz4/lz4.c
+test_h5_sink_CFLAGS = ${HDF5_CFLAGS} -I${srcdir}/pipeline ${BSHUF_CFLAGS}
 test_h5_sink_LDADD = ${HDF5_LIBS}
 endif
 
