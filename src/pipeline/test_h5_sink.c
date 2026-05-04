@@ -2,9 +2,8 @@
  *  Copyright (C) 2026 Novatron Fusion Group.                                *
  *                                                                          *
  *  Host-side Tier-1 test for the h5 sink. Writes a deterministic pattern   *
- *  into /tmp/test_h5_sink.h5 with bitshuffle+LZ4 compression, then reads  *
- *  back the raw chunks and verifies decompression.                         *
- *  Links against libhdf5 + bitshuffle + LZ4 -- no GLib, no GStreamer.      *
+ *  into /tmp/test_h5_sink.h5, then reads back and verifies.                *
+ *  Links against libhdf5 -- no GLib, no GStreamer.                         *
  ****************************************************************************/
 #include <stdio.h>
 #include <stdlib.h>
@@ -14,11 +13,17 @@
 #include <stdint.h>
 #include <inttypes.h>
 
+#ifdef HAVE_CONFIG_H
+#include "config.h"
+#endif
+
 #include <hdf5.h>
 
 #include "h5.h"
+#ifdef HAVE_BITSHUFFLE
 #include "bitshuffle.h"
 #include "bshuf_h5filter.h"
+#endif
 
 #define TEST_HRES    64
 #define TEST_VRES    48
@@ -178,6 +183,7 @@ test_forced_errored_close(void)
     return 0;
 }
 
+#ifdef HAVE_BITSHUFFLE
 static int
 test_readback_verify(void)
 {
@@ -272,13 +278,14 @@ out:
     free(expected);
     return ret;
 }
+#endif /* HAVE_BITSHUFFLE */
 
+/* Read-back test that works with both compressed and uncompressed files.
+ * Uses standard H5Dread -- if the file is compressed the bitshuffle filter
+ * must be registered first (done in main). */
 static int
-test_h5dread_roundtrip(void)
+test_h5dread_verify(void)
 {
-    /* Read the file written by test_happy_path via H5Dread, exactly as a
-     * user with the bitshuffle filter registered would. This exercises the
-     * full HDF5 filter pipeline decompression path. */
     hid_t file, dset, fspace, mspace;
     uint16_t *frame = NULL;
     uint16_t *expected = NULL;
@@ -287,27 +294,21 @@ test_h5dread_roundtrip(void)
     uint32_t i;
     int ret = -1;
 
-    /* Register the bitshuffle filter so H5Dread can decompress. */
-    if (bshuf_register_h5filter() < 0) {
-        fprintf(stderr, "test_h5dread_roundtrip: bshuf_register_h5filter failed\n");
-        return -1;
-    }
-
     frame    = malloc(frame_bytes);
     expected = malloc(frame_bytes);
     if (!frame || !expected) {
-        fprintf(stderr, "test_h5dread_roundtrip: malloc failed\n");
+        fprintf(stderr, "test_h5dread_verify: malloc failed\n");
         goto out;
     }
 
     file = H5Fopen(TEST_PATH, H5F_ACC_RDONLY, H5P_DEFAULT);
     if (file < 0) {
-        fprintf(stderr, "test_h5dread_roundtrip: H5Fopen failed\n");
+        fprintf(stderr, "test_h5dread_verify: H5Fopen failed\n");
         goto out;
     }
     dset = H5Dopen2(file, "/frames", H5P_DEFAULT);
     if (dset < 0) {
-        fprintf(stderr, "test_h5dread_roundtrip: H5Dopen2 failed\n");
+        fprintf(stderr, "test_h5dread_verify: H5Dopen2 failed\n");
         H5Fclose(file);
         goto out;
     }
@@ -323,7 +324,7 @@ test_h5dread_roundtrip(void)
 
         if (H5Dread(dset, H5T_NATIVE_UINT16, mspace, fspace,
                     H5P_DEFAULT, frame) < 0) {
-            fprintf(stderr, "test_h5dread_roundtrip: H5Dread failed at frame %u\n", i);
+            fprintf(stderr, "test_h5dread_verify: H5Dread failed at frame %u\n", i);
             H5Sclose(mspace); H5Sclose(fspace);
             H5Dclose(dset); H5Fclose(file);
             goto out;
@@ -331,7 +332,7 @@ test_h5dread_roundtrip(void)
 
         fill_frame(expected, TEST_HRES, TEST_VRES, i);
         if (memcmp(frame, expected, frame_bytes) != 0) {
-            fprintf(stderr, "test_h5dread_roundtrip: data mismatch at frame %u\n", i);
+            fprintf(stderr, "test_h5dread_verify: data mismatch at frame %u\n", i);
             H5Sclose(mspace); H5Sclose(fspace);
             H5Dclose(dset); H5Fclose(file);
             goto out;
@@ -342,7 +343,7 @@ test_h5dread_roundtrip(void)
     H5Sclose(fspace);
     H5Dclose(dset);
     H5Fclose(file);
-    printf("test_h5dread_roundtrip: all %d frames read via H5Dread and verified\n",
+    printf("test_h5dread_verify: all %d frames read via H5Dread and verified\n",
            TEST_NFRAMES);
     ret = 0;
 
@@ -356,9 +357,16 @@ int
 main(void)
 {
     int rc = 0;
+
     if (test_happy_path() < 0) rc = 1;
+#ifdef HAVE_BITSHUFFLE
     if (test_readback_verify() < 0) rc = 1;
-    if (test_h5dread_roundtrip() < 0) rc = 1;
+    /* Register the bitshuffle filter AFTER writing tests — set_local would
+     * re-expand the already-expanded cd_values if registered before
+     * H5Dcreate.  Only needed for H5Dread-based verification. */
+    bshuf_register_h5filter();
+#endif
+    if (test_h5dread_verify() < 0) rc = 1;
     if (test_overflow_rejected() < 0) rc = 1;
     if (test_forced_errored_close() < 0) rc = 1;
     if (rc == 0) printf("ALL TESTS PASSED\n");

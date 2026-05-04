@@ -79,6 +79,21 @@ else
   ])
 fi
 
+## Bitshuffle + LZ4 compression for the HDF5 sink (optional).
+## Disabled by default. Enable on host builds where CPU budget allows:
+##   ./configure --enable-bitshuffle
+AC_ARG_ENABLE([bitshuffle],
+  [AS_HELP_STRING([--enable-bitshuffle],
+    [Enable bitshuffle+LZ4 compression in HDF5 recordings (default: uncompressed)])],
+  [enable_bitshuffle="$enableval"],
+  [enable_bitshuffle=no])
+
+if test "x$enable_bitshuffle" = xyes; then
+  AC_DEFINE([HAVE_BITSHUFFLE], [1],
+    [Define to 1 to enable bitshuffle+LZ4 compression in HDF5 recordings.])
+fi
+AM_CONDITIONAL([HAVE_BITSHUFFLE], [test "x$enable_bitshuffle" = xyes])
+
 AC_SYS_LARGEFILE
 
 AC_CONFIG_HEADERS([config.h])

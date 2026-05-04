@@ -3,10 +3,13 @@
 Command line tools for controlling the Chronos camera. Includes a D-Bus API mock
 and the GStreamer-based cam-pipeline daemon (live display + recording).
 
-The HDF5 recording sink uses **bitshuffle + LZ4** compression (filter ID 32008)
-via `H5Dwrite_chunk()` direct chunk writes. HDF5 1.10.11 is linked statically,
-so the camera binary has **no libhdf5 runtime dependency** — deployment is a
-single binary copy.
+The HDF5 recording sink writes chunks directly via `H5Dwrite_chunk()` for
+maximum throughput. **Bitshuffle + LZ4** compression (filter ID 32008) is
+available as an optional build-time feature (`--enable-bitshuffle`, off by
+default). On the camera's single-core Cortex-A8, compression is disabled
+by default to stay within CPU budget. HDF5 1.10.11 is
+linked statically, so the camera binary has **no libhdf5 runtime dependency**
+— deployment is a single binary copy.
 
 ## Dependencies
 
@@ -52,8 +55,15 @@ For iterating on `h5.c` without a camera:
 
 ```bash
 ./bootstrap
-./configure
-make check          # runs src/test_h5_sink (C tests)
+./configure                    # bitshuffle disabled by default
+make check                     # runs src/test_h5_sink (C tests)
+```
+
+To test with bitshuffle+LZ4 compression:
+
+```bash
+./configure --enable-bitshuffle
+make check
 ```
 
 Runs `src/test_h5_sink`. On success: `ALL TESTS PASSED`.
@@ -210,7 +220,8 @@ The project includes VS Code tasks in `.vscode/tasks.json`:
 
 - **Build (ARM chroot)** (`Ctrl+Shift+B`) — copies source into the chroot,
   fixes autotools symlinks, and runs
-  `configure --with-hdf5-static=/opt/hdf5-static && make` via QEMU.
+  `configure --with-hdf5-static=/opt/hdf5-static && make`
+  via QEMU.
 - **Build + test (host)** — runs `configure && make check` natively.
 - **Mount chroot** — sets up the image + overlay mounts (run once per session).
 - **Unmount chroot** — tears down the mounts.
